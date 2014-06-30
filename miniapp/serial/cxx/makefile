@@ -51,3 +51,6 @@ clean:
 	rm -f *.lst
 	rm -f output.*
 
+tags:
+	ctags -R .
+
