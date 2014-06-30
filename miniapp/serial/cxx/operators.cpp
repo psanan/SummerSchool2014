@@ -95,7 +95,7 @@ void diffusion(const data::Field &U, data::Field &S)
         }
     }
 
-    // the south boundary
+    // the south boundary (plus SW and SE corners)
     {
         int j = 0;
 
