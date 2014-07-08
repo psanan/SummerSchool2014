@@ -110,20 +110,43 @@ void ss_fill(double* x, const double value, const int N)
 // computes y := alpha*x + y
 // x and y are vectors on length N
 // alpha is a scalar
+
+
+
+
+
+
 void ss_axpy(double* y, const double alpha, const double* x, const int N)
 {
 	int i;
 
-// TODO allocate arrays on the GPU
-// TODO transfer data
-// TODO replace kernel with call to a CUDA kernel
+// Allocate arrays on the Device
+double* y_d;
+double* x_d;
+CUDA_ERR_CHECK( cudaMalloc(&x_d,    N * sizeof(double)) );
+CUDA_ERR_CHECK( cudaMalloc(&y_d,    N * sizeof(double)) );
 
+// Transfer Data to Device
+CUDA_ERR_CHECK( cudaMemcpy(x_d, x, N * sizeof(double), cudaMemcpyHostToDevice) );
+CUDA_ERR_CHECK( cudaMemcpy(y_d, y, N * sizeof(double), cudaMemcpyHostToDevice) );
+
+// TODO replace kernel with call to a CUDA kernel
+// ...
+
+
+// Wait
+CUDA_ERR_CHECK( cudaDeviceSynchronize() );
+
+// Transfer data back from th GPU to the CPU array
+CUDA_ERR_CHECK( cudaMemcpy(y, y_d, N * sizeof(double), cudaMemcpyDeviceToHost) );
+
+// Deallocate arrays on the GPU
+CUDA_ERR_CHECK( cudaFree(x_d) );
+CUDA_ERR_CHECK( cudaFree(y_d) );
+
+// TODO remove this CPU loop
     for (i = 0; i < N; i++)
         y[i] += alpha * x[i];
-
-// TODO wait
-// TODO transfer data back from th GPU to the CPU array
-// TODO deallocate arrays on the GPU
 
     // record the number of floating point oporations
     flops_blas1 = flops_blas1 + 2 * N;
