@@ -17,7 +17,6 @@
 #define S(j,i)    sp[(i) + (j)*nx]
 #define X(j,i) x_old[(i) + (j)*nx]
 
-// TODO
 // Taget: Given that up and sp data are already on GPU, implement a set of
 // GPU kernels for diffusion operator
 // Things to note:
@@ -26,14 +25,39 @@
 // 3) Note options structure has cpu:: and gpu:: versions
 // 4) Note you can turn every loop of diffusion into separate GPU kernel
 // and run all of them asynchronously.
+// 5) We won't use the template parameters (these are for vectorizing within each thread)
 namespace gpu
 {
 	namespace diffusion_interior_grid_points_kernel
 	{
-		template<short V, typename T>
+		template<short V, typename T> 
 		__global__ void kernel(const double* const __restrict__ up, double* __restrict__ sp)
 		{
-			// TODO implement GPU kernel, equivalent to the original code in cuda-1/operators.c
+      using namespace gpu;
+
+			// recover global indices
+			const int i = blockIdx.x * blockDim.x + threadIdx.x;
+			const int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+			// Recover parameters from options (already copied to global GPU memory)
+			const double alpha = options.alpha;
+			const double dxs = 1000.*options.dx*options.dx;
+			const int nx = options.nx;
+			const int ny = options.ny;
+
+      // return if out of range 
+      if ((i < 1) || (i > nx-1) || (j < 1) || (j > ny-1)){
+        return;
+      }
+
+
+			// Apply stencil
+			S(j, i) = -(4. + alpha)*U(j,i)    // central point
+                                    + U(j,i-1) + U(j,i+1) // east and west
+                                    + U(j-1,i) + U(j+1,i) // north and south
+
+                                    + alpha*X(j,i)
+                                    + dxs*U(j,i)*(1.0 - U(j,i));
 		}
 
 		config_t config;
@@ -44,7 +68,40 @@ namespace gpu
 		template<short V, typename T>
 		__global__ void kernel(const double* const __restrict__ up, double* __restrict__ sp)
 		{
-			// TODO implement GPU kernel, equivalent to the original code in cuda-1/operators.c
+      using namespace gpu;
+
+			// recover global index
+			const int i_east = options.nx -1;
+			const int i_west = 0;
+			const int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+			// Recover parameters from options (already copied to global GPU memory)
+			const double alpha = options.alpha;
+			const double dxs = 1000.*options.dx*options.dx;
+			const int nx = options.nx;
+			const int ny = options.ny;
+
+      // return if out of range 
+      if ((j < 1) || (j > ny-1)){
+        return;
+      }
+			// Apply stencil
+			{
+				const int i = i_east;
+				S(j, i) = -(4. + alpha) * U(j,i)
+					+ U(j, i - 1) + U(j - 1, i) + U(j + 1, i)
+					+ alpha*X(j, i) + bndE[j]
+					+ dxs * U(j, i) * (1.0 - U(j, i));
+			}
+
+			{
+				const int i = i_west;
+				S(j, i) = -(4. + alpha) * U(j, i)
+					+ U(j, i + 1) + U(j - 1, i) + U(j + 1, i)
+
+					+ alpha*X(j, i) + bndW[j]
+					+ dxs*U(j, i) * (1.0 - U(j, i));
+			}
 		}
 
 		config_t config;
@@ -55,7 +112,42 @@ namespace gpu
 		template<short V, typename T>
 		__global__ void kernel(const double* const __restrict__ up, double* __restrict__ sp)
 		{
-			// TODO implement GPU kernel, equivalent to the original code in cuda-1/operators.c
+      using namespace gpu;
+
+			// recover global indices
+			const int i = blockIdx.x * blockDim.x + threadIdx.x;
+			const int j_north = options.nx - 1;
+			const int j_south = 0;
+
+			// Recover parameters from options (already copied to global GPU memory)
+			const double alpha = options.alpha;
+			const double dxs = 1000.*options.dx*options.dx;
+			const int nx = options.nx;
+			const int ny = options.ny;
+
+      // return if out of range 
+      if ((i < 1) || (i > nx-1)){
+        return;
+      }
+
+			// Apply stencils
+			{
+				const int j = j_north;
+				S(j, i) = -(4. + alpha) * U(j, i)
+					+ U(j, i - 1) + U(j, i + 1) + U(j - 1, i)
+					+ alpha*X(j, i) + bndN[i]
+					+ dxs * U(j, i) * (1.0 - U(j, i));
+			}
+
+			{
+				const int j = j_south;
+				S(j, i) = -(4. + alpha) * U(j, i)
+					+ U(j, i - 1) + U(j, i + 1) + U(j + 1, i)
+					+ alpha * X(j, i) + bndS[i]
+					+ dxs * U(j, i) * (1.0 - U(j, i));
+
+
+			}
 		}
 
 		config_t config;
@@ -65,9 +157,56 @@ namespace gpu
 	{
 		__global__ void kernel(const double* const __restrict__ up, double* __restrict__ sp)
 		{
-			// TODO implement GPU kernel, equivalent to the original code in cuda-1/operators.c
-		}
-	}
+      using namespace gpu;
+
+			// recover global indices
+			const int i_east = options.nx -1;
+			const int i_west = 0;
+			const int j_north = options.nx - 1;
+			const int j_south = 0;
+
+			// Recover parameters from options (already copied to global GPU memory)
+			const double alpha = options.alpha;
+			const double dxs = 1000.*options.dx*options.dx;
+			const int nx = options.nx;
+			const int ny = options.ny;
+
+			// Apply stencils
+      {
+        const int i = i_west;
+        const int j = j_north;
+        S(j, i) = -(4. + alpha) * U(j, i)
+          + U(j, i + 1) + U(j - 1, i)
+
+          + alpha * X(j, i) + bndW[j] + bndN[i]
+          + dxs * U(j, i) * (1.0 - U(j, i));
+      }
+      {
+        const int i = i_east;
+        const int j = j_north;
+        S(j, i) = -(4. + alpha) * U(j, i)
+          + U(j, i - 1) + U(j - 1, i)
+          + alpha * X(j, i) + bndE[j] + bndN[i]
+          + dxs * U(j, i) * (1.0 - U(j, i));
+      }
+      {
+        const int i = i_west;
+        const int j = j_south;
+        S(j, i) = -(4. + alpha) * U(j, i)
+          + U(j, i + 1) + U(j + 1, i)
+          + alpha * X(j, i) + bndW[j] + bndS[i]
+          + dxs * U(j, i) * (1.0 - U(j, i));
+      }
+      {
+        const int i = i_east;
+        const int j = j_south;
+        S(j, i) = -(4. + alpha) * U(j, i)
+          + U(j, i - 1) + U(j + 1, i)
+          + alpha * X(j, i) + bndE[j] + bndS[i]
+          + dxs * U(j, i) * (1.0 - U(j, i));
+      }
+    }
+  }
 }
 
 inline void diffusion(const double* const __restrict__ up, double* __restrict__ sp)
