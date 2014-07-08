@@ -10,6 +10,19 @@ extern "C"{
 #include <stdio.h>
 #include <stdlib.h>
 
+// NOTE: there are lots of ACC todays - ignore those, as this time we're going for CUDA!
+
+// Always use these (and if you want, have a fancier version that you can 
+//  turn off for production runs)
+#define CUDA_ERR_CHECK(x) \
+	do { cudaError_t err = x; if (err != cudaSuccess) { \
+		fprintf (stderr, "Error \"%s\" at %s:%d \n", \
+		 cudaGetErrorString(err), \
+		__FILE__, __LINE__); exit(-1); \
+	}} while (0);
+
+
+
 int cg_initialized = 0;
 double *r = NULL, *Ap = NULL, *p = NULL;
 double *Fx = NULL, *Fxold = NULL, *v = NULL, *xold = NULL; // 1d
@@ -100,9 +113,17 @@ void ss_fill(double* x, const double value, const int N)
 void ss_axpy(double* y, const double alpha, const double* x, const int N)
 {
 	int i;
-// TODO:  ACC PARALLEL region: 
+
+// TODO allocate arrays on the GPU
+// TODO transfer data
+// TODO replace kernel with call to a CUDA kernel
+
     for (i = 0; i < N; i++)
         y[i] += alpha * x[i];
+
+// TODO wait
+// TODO transfer data back from th GPU to the CPU array
+// TODO deallocate arrays on the GPU
 
     // record the number of floating point oporations
     flops_blas1 = flops_blas1 + 2 * N;
