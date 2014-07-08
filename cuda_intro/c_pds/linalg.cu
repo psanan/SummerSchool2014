@@ -14,13 +14,23 @@ extern "C"{
 
 // Always use these (and if you want, have a fancier version that you can 
 //  turn off for production runs)
+#ifndef NDEBUG
 #define CUDA_ERR_CHECK(x) \
 	do { cudaError_t err = x; if (err != cudaSuccess) { \
 		fprintf (stderr, "Error \"%s\" at %s:%d \n", \
 		 cudaGetErrorString(err), \
 		__FILE__, __LINE__); exit(-1); \
 	}} while (0);
+#else
+#define CUDA_ERR_CHECK(x) \
+        do{ } while(0);
+#endif
 
+// We define a block size which should be generally efficient
+#define BLOCKSIZE 128
+
+// A convenience to allow for breaking things into blocks
+#define ROUNDUP(n, width) (((n) + (width) - 1) & ~unsigned((width) - 1))
 
 
 int cg_initialized = 0;
@@ -111,45 +121,45 @@ void ss_fill(double* x, const double value, const int N)
 // x and y are vectors on length N
 // alpha is a scalar
 
+// CUDA kernel
+__global__ void ss_axpy_kernel(double* y, const double alpha, const double* x, const int N)
+{
+	//compute the index into the 1D array
+	const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-
-
-
+	//perform the axpy (at this index only!)
+	y[idx] += alpha * x[idx];
+}
 
 void ss_axpy(double* y, const double alpha, const double* x, const int N)
 {
-	int i;
 
-// Allocate arrays on the Device
-double* y_d;
-double* x_d;
-CUDA_ERR_CHECK( cudaMalloc(&x_d,    N * sizeof(double)) );
-CUDA_ERR_CHECK( cudaMalloc(&y_d,    N * sizeof(double)) );
+	// Allocate arrays on the Device
+	double* y_d;
+	double* x_d;
+	CUDA_ERR_CHECK( cudaMalloc(&x_d,    N * sizeof(double)) );
+	CUDA_ERR_CHECK( cudaMalloc(&y_d,    N * sizeof(double)) );
 
-// Transfer Data to Device
-CUDA_ERR_CHECK( cudaMemcpy(x_d, x, N * sizeof(double), cudaMemcpyHostToDevice) );
-CUDA_ERR_CHECK( cudaMemcpy(y_d, y, N * sizeof(double), cudaMemcpyHostToDevice) );
+	// Transfer Data to Device
+	CUDA_ERR_CHECK( cudaMemcpy(x_d, x, N * sizeof(double), cudaMemcpyHostToDevice) );
+	CUDA_ERR_CHECK( cudaMemcpy(y_d, y, N * sizeof(double), cudaMemcpyHostToDevice) );
 
-// TODO replace kernel with call to a CUDA kernel
-// ...
+	// Replace kernel with call to a CUDA kernel
+	ss_axpy_kernel<<<ROUNDUP(N,BLOCKSIZE)/BLOCKSIZE,BLOCKSIZE>>>(y_d,alpha,x_d,N) ;
+	CUDA_ERR_CHECK( cudaGetLastError() ); // kernels don't return errors, so get it this way
 
+	// Wait
+	CUDA_ERR_CHECK( cudaDeviceSynchronize() );
 
-// Wait
-CUDA_ERR_CHECK( cudaDeviceSynchronize() );
+	// Transfer data back from th GPU to the CPU array
+	CUDA_ERR_CHECK( cudaMemcpy(y, y_d, N * sizeof(double), cudaMemcpyDeviceToHost) );
 
-// Transfer data back from th GPU to the CPU array
-CUDA_ERR_CHECK( cudaMemcpy(y, y_d, N * sizeof(double), cudaMemcpyDeviceToHost) );
+	// Deallocate arrays on the GPU
+	CUDA_ERR_CHECK( cudaFree(x_d) );
+	CUDA_ERR_CHECK( cudaFree(y_d) );
 
-// Deallocate arrays on the GPU
-CUDA_ERR_CHECK( cudaFree(x_d) );
-CUDA_ERR_CHECK( cudaFree(y_d) );
-
-// TODO remove this CPU loop
-    for (i = 0; i < N; i++)
-        y[i] += alpha * x[i];
-
-    // record the number of floating point oporations
-    flops_blas1 = flops_blas1 + 2 * N;
+	// record the number of floating point oporations
+	flops_blas1 = flops_blas1 + 2 * N;
 }
 
 // computes y = x + alpha*(l-r)
