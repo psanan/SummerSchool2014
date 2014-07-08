@@ -134,6 +134,7 @@ __global__ void ss_axpy_kernel(double* y, const double alpha, const double* x, c
 void ss_axpy(double* y, const double alpha, const double* x, const int N)
 {
 
+#ifndef SKIP_CUDA
 	// Allocate arrays on the Device
 	double* y_d;
 	double* x_d;
@@ -157,6 +158,12 @@ void ss_axpy(double* y, const double alpha, const double* x, const int N)
 	// Deallocate arrays on the GPU
 	CUDA_ERR_CHECK( cudaFree(x_d) );
 	CUDA_ERR_CHECK( cudaFree(y_d) );
+#else
+	int i;
+	for(i=0;i<N;++i){
+		y[i] += alpha * x[i];
+	}
+#endif
 
 	// record the number of floating point oporations
 	flops_blas1 = flops_blas1 + 2 * N;

@@ -4,6 +4,10 @@ CXX=nvcc
 #CXXFLAGS=-O3 -h acc
 CXXFLAGS=  -O3 -arch=sm_35 -Xcompiler -fopenmp #-openmp is just to use their timers!
 
+# things to compile with different options
+#CXXFLAGS+=-DSKIP_CUDA
+#CXXFLAGS+=-DNDEBUG
+
 SOURCES = stats.c data.c operators.c linalg.cu
 HEADERS = stats.h   data.h   operators.h   linalg.h
 OBJ     = stats.o   data.o   operators.o   linalg.o
@@ -34,6 +38,6 @@ clean:
 
 # A test run, for convenience
 run:
-	aprun  ./main 16 16 1000 0.1
+	aprun  ./main 256 256 100 0.01
 
 .PHONY:run clean all
