@@ -17,7 +17,7 @@
 #define S(j,i)    sp[(i) + (j)*nx]
 #define X(j,i) x_old[(i) + (j)*nx]
 
-// Taget: Given that up and sp data are already on GPU, implement a set of
+// Target: Given that up and sp data are already on GPU, implement a set of
 // GPU kernels for diffusion operator
 // Things to note:
 // 1) Look into how kernels in linalg are implemented
@@ -50,14 +50,13 @@ namespace gpu
         return;
       }
 
-
 			// Apply stencil
 			S(j, i) = -(4. + alpha)*U(j,i)    // central point
-                                    + U(j,i-1) + U(j,i+1) // east and west
-                                    + U(j-1,i) + U(j+1,i) // north and south
+                                + U(j,i-1) + U(j,i+1) // east and west
+                                + U(j-1,i) + U(j+1,i) // north and south
 
-                                    + alpha*X(j,i)
-                                    + dxs*U(j,i)*(1.0 - U(j,i));
+                                + alpha*X(j,i)
+                                + dxs*U(j,i)*(1.0 - U(j,i));
 		}
 
 		config_t config;
@@ -71,9 +70,9 @@ namespace gpu
       using namespace gpu;
 
 			// recover global index
-			const int i_east = options.nx -1;
+			const int i_east = options.nx - 1;
 			const int i_west = 0;
-			const int j = blockIdx.y * blockDim.y + threadIdx.y;
+			const int j = blockIdx.y * blockDim.y + threadIdx.y + 1; //+1 since we allocated in some way I was supposed to be able to ignore..
 
 			// Recover parameters from options (already copied to global GPU memory)
 			const double alpha = options.alpha;
@@ -115,15 +114,14 @@ namespace gpu
       using namespace gpu;
 
 			// recover global indices
-			const int i = blockIdx.x * blockDim.x + threadIdx.x;
-			const int j_north = options.nx - 1;
+			const int i = blockIdx.x * blockDim.x + threadIdx.x + 1; //+1 since memory was allocated that way
+			const int j_north = options.ny - 1;
 			const int j_south = 0;
 
 			// Recover parameters from options (already copied to global GPU memory)
 			const double alpha = options.alpha;
 			const double dxs = 1000.*options.dx*options.dx;
 			const int nx = options.nx;
-			const int ny = options.ny;
 
       // return if out of range 
       if ((i < 1) || (i > nx-1)){
@@ -145,8 +143,6 @@ namespace gpu
 					+ U(j, i - 1) + U(j, i + 1) + U(j + 1, i)
 					+ alpha * X(j, i) + bndS[i]
 					+ dxs * U(j, i) * (1.0 - U(j, i));
-
-
 			}
 		}
 
@@ -162,14 +158,13 @@ namespace gpu
 			// recover global indices
 			const int i_east = options.nx -1;
 			const int i_west = 0;
-			const int j_north = options.nx - 1;
+			const int j_north = options.ny - 1;
 			const int j_south = 0;
 
 			// Recover parameters from options (already copied to global GPU memory)
 			const double alpha = options.alpha;
 			const double dxs = 1000.*options.dx*options.dx;
 			const int nx = options.nx;
-			const int ny = options.ny;
 
 			// Apply stencils
       {
