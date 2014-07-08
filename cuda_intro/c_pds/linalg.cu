@@ -1,9 +1,10 @@
 // linear algebra subroutines
 // Ben Cumming @ CSCS
-
+extern "C"{
 #include "linalg.h"
 #include "operators.h"
 #include "stats.h"
+}
 
 #include <math.h>
 #include <stdio.h>
