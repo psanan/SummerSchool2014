@@ -28,7 +28,7 @@ clean:
 	rm -f main *.o *.i output.bov output.bin
 
 run : main
-	aprun ./main 128 128 100 0.1
+	aprun ./main 128 128 100 0.01
 
 test: main
 	aprun ./main 128 128 100 0.01 > result && diff -u result result.ref

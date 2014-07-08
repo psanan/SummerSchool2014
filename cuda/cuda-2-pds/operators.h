@@ -72,20 +72,20 @@ namespace gpu
 			// recover global index
 			const int i_east = options.nx - 1;
 			const int i_west = 0;
-			const int j = blockIdx.y * blockDim.y + threadIdx.y + 1; //+1 since we allocated in some way I was supposed to be able to ignore..
+			const int j = blockIdx.y * blockDim.y + threadIdx.y + 1; //+1  due to details of allocation (see main.cu)
 
 			// Recover parameters from options (already copied to global GPU memory)
 			const double alpha = options.alpha;
 			const double dxs = 1000.*options.dx*options.dx;
 			const int nx = options.nx;
-			const int ny = options.ny;
+			const int ny = options.nx;
 
       // return if out of range 
-      if ((j < 1) || (j > ny-1)){
+      if (j > ny-1){
         return;
       }
 			// Apply stencil
-			{
+			{ // East Boundary
 				const int i = i_east;
 				S(j, i) = -(4. + alpha) * U(j,i)
 					+ U(j, i - 1) + U(j - 1, i) + U(j + 1, i)
@@ -93,7 +93,7 @@ namespace gpu
 					+ dxs * U(j, i) * (1.0 - U(j, i));
 			}
 
-			{
+			{ // West Boundary
 				const int i = i_west;
 				S(j, i) = -(4. + alpha) * U(j, i)
 					+ U(j, i + 1) + U(j - 1, i) + U(j + 1, i)
@@ -123,13 +123,12 @@ namespace gpu
 			const double dxs = 1000.*options.dx*options.dx;
 			const int nx = options.nx;
 
-      // return if out of range 
-      if ((i < 1) || (i > nx-1)){
+      // Return if out of range
+      if (i > nx-1){
         return;
       }
-
 			// Apply stencils
-			{
+			{ //North Boundary
 				const int j = j_north;
 				S(j, i) = -(4. + alpha) * U(j, i)
 					+ U(j, i - 1) + U(j, i + 1) + U(j - 1, i)
@@ -137,7 +136,7 @@ namespace gpu
 					+ dxs * U(j, i) * (1.0 - U(j, i));
 			}
 
-			{
+			{ // South Boundary
 				const int j = j_south;
 				S(j, i) = -(4. + alpha) * U(j, i)
 					+ U(j, i - 1) + U(j, i + 1) + U(j + 1, i)
